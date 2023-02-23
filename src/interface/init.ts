@@ -1,7 +1,5 @@
 import * as Redis from "redis";
-import { userSchemas } from "schemas/users";
 import * as dotenv from "dotenv";
-import { RedisUserKey } from "types/redis";
 
 dotenv.config();
 
@@ -18,26 +16,4 @@ export async function connect() {
     },
   });
   await global.redis.connect();
-}
-
-export async function createUserIndices(indices: RedisUserKey[]) {
-  await Promise.all(indices.map((i) => createUserIndex(i)));
-}
-
-async function createUserIndex(index: RedisUserKey) {
-  try {
-    await global.redis.ft.info(index);
-  } catch (e) {
-    console.log("Creating new index", index);
-    global.redis.ft
-      .create(index, userSchemas[index], {
-        ON: "JSON",
-        PREFIX: index
-      })
-      .then(() => console.log("Successfully created new index", index))
-      .catch((e) => {
-        console.log("Error: Could not create new index", index, e);
-        throw e;
-      });
-  }
 }

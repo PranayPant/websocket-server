@@ -1,7 +1,6 @@
-import { RedisUserKey } from "./redis";
 
 export interface WebsocketRequestResponse {
-  type: RedisUserKey;
+  type: string;
   id: string;
   data: any;
 }
