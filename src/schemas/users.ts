@@ -1,16 +1,21 @@
 import { RediSearchSchema, SchemaFieldTypes } from "redis";
+import { RedisUserKey } from "types/redis";
 
-export const userSchema: RediSearchSchema = {
-  "$.name": {
-    type: SchemaFieldTypes.TEXT,
+const messagesSchema: RediSearchSchema = {
+  "$.data[*]": {
+    type: SchemaFieldTypes.TAG,
     SORTABLE: true,
   },
-  "$.age": {
-    type: SchemaFieldTypes.NUMERIC,
-    AS: "age",
+};
+
+const infoSchema: RediSearchSchema = {
+  "$.location": {
+    type: SchemaFieldTypes.GEO,
+    AS: "location",
   },
-  "$.email": {
-    type: SchemaFieldTypes.TAG,
-    AS: "email",
-  },
+};
+
+export const userSchemas: { [k in RedisUserKey]: RediSearchSchema } = {
+  "users:messages": messagesSchema,
+  "users:info": infoSchema,
 };

@@ -1,0 +1,1 @@
+export type RedisUserKey = 'users:messages' | 'users:info'

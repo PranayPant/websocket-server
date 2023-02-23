@@ -1,10 +1,7 @@
-export type WebsocketMessageType = "users";
-export interface WebsocketMessageData {
+import { RedisUserKey } from "./redis";
+
+export interface WebsocketRequestResponse {
+  type: RedisUserKey;
   id: string;
-  date: number;
-  message: string;
-}
-export interface WebsocketMessage {
-  type: WebsocketMessageType;
-  data: WebsocketMessageData;
+  data: any;
 }
