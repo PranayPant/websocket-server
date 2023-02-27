@@ -5,7 +5,7 @@ import * as Redis from "redis";
 import { WebsocketRequestResponse } from "types/socket";
 import { geoAdd, geoSearch } from "interface/user";
 import { connect } from "interface/init";
-import { RedisGeoMember, RedisGeoSearchResult } from "types/redis";
+import { RedisGeoMember } from "types/redis";
 
 dotenv.config();
 
@@ -31,13 +31,17 @@ const SUBSCRIBERS: Map<string, Redis.RedisClientType> = new Map<
   Redis.RedisClientType
 >();
 
+function format(type: string, data: any) {
+  return JSON.stringify({ type, data });
+}
+
 async function main() {
   await connect();
   const wss = new WebSocket.Server({
     server: httpServer,
   });
   wss.on("connection", (socket: WebSocket.WebSocket) => {
-    socket.send("You just connected to a WebSocket server!");
+    socket.send(format("connect", "You just connected to a WebSocket server!"));
     socket.on("message", async (message: string) => {
       try {
         const json = JSON.parse(message) as WebsocketRequestResponse;
@@ -49,43 +53,44 @@ async function main() {
               SUBSCRIBERS.set(member, global.redis.duplicate());
             }
             const success = await geoAdd(json.data as RedisGeoMember);
-            const nearestUsers = await geoSearch(member, 2000, "km");
+            if (!success) throw Error(`Failed to initialize user ${member}`);
+            const nearestUsers = await geoSearch(
+              member,
+              json.data.radius,
+              json.data.radiusUnit
+            );
             nearestUsers?.forEach((u) =>
               SUBSCRIBERS.set(u.member, global.redis.duplicate())
             );
             socket.send(
-              success
-                ? `User ${member} is ready to search!`
-                : `Error: Failed to initialize search for user ${member}`
+              format("initialized-user", `User ${member} is ready to search!`)
             );
             break;
           }
           case "searching-positions":
             {
               if (!SUBSCRIBERS.size) {
-                socket.send(`Error: No active users found.`);
-                break;
+                throw Error(`Error: No users exist at this time.`);
               }
-              const ret = await geoSearch(member, 2000, "km");
+              const userChannel = SUBSCRIBERS.get(member);
+              const ret = await geoSearch(
+                member,
+                json.data.radius,
+                json.data.radiusUnit
+              );
               if (!ret) {
-                socket.send(
+                throw Error(
                   `Error: Failed to find any users near user ${member}`
                 );
-                break;
               }
-              socket.send(
-                `User ${member}, we found ${ret.length - 1} users near you!`
-              );
-              const userChannel = SUBSCRIBERS.get(member);
+              socket.send(format("nearby-users", ret));
               if (!userChannel) {
-                socket.send(`Error: User ${member} is not logged in.`);
-                break;
+                throw Error(`Error: User ${member} is not logged in.`);
               }
+              if (userChannel?.isOpen) break;
               const subscribePromises = ret.map((r) => {
                 return userChannel.subscribe(r.member, (message) => {
-                  socket.send(
-                    `User ${member}: Hi user ${r.member}! You sent '${message}'`
-                  );
+                  socket.send(format("user-message", message));
                 });
               });
               await userChannel.connect();
@@ -95,11 +100,11 @@ async function main() {
           case "changing-position":
             {
               if (!SUBSCRIBERS.size) {
-                socket.send(`No users online to receive this message!`);
+                throw Error("No users registered in your area");
               }
               global.redis.publish(
                 json.data.member,
-                `User ${json.data.member} updated his position.`
+                JSON.stringify({ data: json.data, action: "position-change" })
               );
             }
             break;
@@ -107,7 +112,8 @@ async function main() {
             console.log("Error: Cannot handle message of type", type);
         }
       } catch (e) {
-        socket.send("Malformed payload");
+        console.error(e);
+        socket.send(format("error", e));
       }
     });
   });
