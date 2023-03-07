@@ -5,12 +5,12 @@ export interface RedisGeoMember extends RedisGeoCoordinates {
 export interface RedisGeoSearchResult {
   member: string;
   distance: string;
-  coordinates: RedisGeoCoordinates
+  coordinates: RedisGeoCoordinates;
 }
 
 export interface RedisGeoCoordinates {
-  latitude: string | number
-  longitude: string | number
+  latitude: string | number;
+  longitude: string | number;
 }
 
 export type RedisGeoUnits = "m" | "km" | "mi" | "ft";

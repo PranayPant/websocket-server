@@ -70,7 +70,7 @@ async function main() {
           case "searching-positions":
             {
               if (!SUBSCRIBERS.size) {
-                throw Error(`Error: No users exist at this time.`);
+                throw Error(`No users exist at this time.`);
               }
               const userChannel = SUBSCRIBERS.get(member);
               const ret = await geoSearch(
@@ -79,13 +79,11 @@ async function main() {
                 json.data.radiusUnit
               );
               if (!ret) {
-                throw Error(
-                  `Error: Failed to find any users near user ${member}`
-                );
+                throw Error(`Failed to find any users near user ${member}`);
               }
               socket.send(format("nearby-users", ret));
               if (!userChannel) {
-                throw Error(`Error: User ${member} is not logged in.`);
+                throw Error(`User ${member} is not logged in.`);
               }
               if (userChannel?.isOpen) break;
               const subscribePromises = ret.map((r) => {
@@ -102,14 +100,24 @@ async function main() {
               if (!SUBSCRIBERS.size) {
                 throw Error("No users registered in your area");
               }
+              const [success, ret] = await Promise.all([
+                geoAdd(json.data as RedisGeoMember),
+                geoSearch(member, 0, "mi"),
+              ]);
+              if (!success)
+                throw Error(`Failed to update location ${json.data}`);
+              if (!ret) throw Error(`Failed to fetch updated user ${member}`);
               global.redis.publish(
                 json.data.member,
-                JSON.stringify({ data: json.data, action: "position-change" })
+                JSON.stringify({
+                  data: ret.find((r) => r.member === member),
+                  action: "position-change",
+                })
               );
             }
             break;
           default:
-            console.log("Error: Cannot handle message of type", type);
+            throw Error(`Cannot handle message of type ${type}`);
         }
       } catch (e) {
         console.error(e);
